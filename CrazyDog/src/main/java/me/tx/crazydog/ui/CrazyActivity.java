@@ -13,6 +13,7 @@ import io.reactivex.rxjava3.disposables.CompositeDisposable;
 import io.reactivex.rxjava3.observers.DisposableObserver;
 import io.reactivex.rxjava3.schedulers.Schedulers;
 import me.tx.crazydog.CrazyDog;
+import me.tx.crazydog.task.TaskDog;
 
 public abstract class CrazyActivity extends AppCompatActivity {
     Bundle savedInstanceState;
@@ -67,4 +68,5 @@ public abstract class CrazyActivity extends AppCompatActivity {
                         .observeOn(AndroidSchedulers.mainThread())
                         .subscribeWith(disposableObserver));
     }
+
 }

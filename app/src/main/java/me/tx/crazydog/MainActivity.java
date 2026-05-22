@@ -18,6 +18,7 @@ import me.tx.crazydog.cache.CrazyDogCache;
 import me.tx.crazydog.net.LoadingObserver;
 import me.tx.crazydog.net.NetDogObserver;
 import me.tx.crazydog.net.NetDogSetting;
+import me.tx.crazydog.task.TaskDog;
 import me.tx.crazydog.ui.CrazyActivity;
 
 public class MainActivity extends CrazyActivity {
@@ -60,6 +61,22 @@ public class MainActivity extends CrazyActivity {
         CacheTestBean cacheNew = testBeanCrazyDogCache.getCache();
         Log.e("CrazyDogCache", JSON.toJSONString(cacheNew));
 
-    }
+        new TestTask().start(new TaskDog.ITaskResult<Boolean>() {
+            @Override
+            public void done(Boolean aBoolean) {
+                // 主线程：任务执行完
+                // aBoolean 就是 test() 返回的值
+                if (aBoolean) {
+                    Log.e("TaskDog","处理完成");
+                } else {
+                    Log.e("TaskDog","处理失败");
+                }
+            }
 
+            @Override
+            public void failed(String reason) {
+                // 主线程：出错了
+            }
+        });
+    }
 }
