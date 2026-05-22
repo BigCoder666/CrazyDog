@@ -1,0 +1,26 @@
+apply plugin: 'com.android.library'
+
+android {
+    namespace 'me.tx.crazydog'
+
+    defaultConfig {
+        minSdk 24
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+    compileSdk 34
+}
+
+dependencies {
+    implementation fileTree(include: ['*.jar', '*.aar'], dir: 'libs')
+    api 'androidx.appcompat:appcompat:1.4.1'
+    api 'com.google.android.material:material:1.7.0'
+    api 'io.reactivex.rxjava3:rxandroid:3.0.2'
+    api 'io.reactivex.rxjava3:rxjava:3.1.5'
+    api "com.squareup.retrofit2:retrofit:3.0.0"
+    api "com.squareup.retrofit2:adapter-rxjava3:3.0.0"
+    implementation 'com.squareup.okhttp3:logging-interceptor:5.3.2'
+    api 'com.alibaba:fastjson:1.2.73'
+}
