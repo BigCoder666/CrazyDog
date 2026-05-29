@@ -12,6 +12,7 @@ import com.alibaba.fastjson.JSONObject;
 import java.util.HashMap;
 
 import io.reactivex.rxjava3.annotations.NonNull;
+import io.reactivex.rxjava3.disposables.Disposable;
 import io.reactivex.rxjava3.observers.DisposableObserver;
 import me.tx.crazydog.bean.CrazyDogBean;
 import me.tx.crazydog.cache.CrazyDogCache;
@@ -33,7 +34,7 @@ public class MainActivity extends CrazyActivity {
             HashMap<String,String> requestParams = new HashMap<>();
             requestParams.put("username","15730538888");
             requestParams.put("password","123456");
-            requestIO2Main(getService(TestService.class).loginAuthMain(requestParams), new DogeObserver<JSONObject>(this) {
+            Disposable d = requestIO2Main(getService(TestService.class).loginAuthMain(requestParams), new DogeObserver<JSONObject>(this) {
                 @Override
                 public void onSuccess(JSONObject j) {
 
@@ -44,6 +45,7 @@ public class MainActivity extends CrazyActivity {
 
                 }
             });
+//            d.dispose();
         });
 
 

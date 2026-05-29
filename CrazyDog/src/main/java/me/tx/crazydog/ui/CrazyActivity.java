@@ -10,6 +10,7 @@ import io.reactivex.rxjava3.annotations.NonNull;
 import io.reactivex.rxjava3.core.Observable;
 import io.reactivex.rxjava3.core.Scheduler;
 import io.reactivex.rxjava3.disposables.CompositeDisposable;
+import io.reactivex.rxjava3.disposables.Disposable;
 import io.reactivex.rxjava3.observers.DisposableObserver;
 import io.reactivex.rxjava3.schedulers.Schedulers;
 import me.tx.crazydog.CrazyDog;
@@ -62,11 +63,13 @@ public abstract class CrazyActivity extends AppCompatActivity {
         disposables.clear();
     }
 
-    public <T> void requestIO2Main(Observable<T> observable,DisposableObserver<T> disposableObserver){
-        disposables.add(
-                observable.subscribeOn(Schedulers.io())
-                        .observeOn(AndroidSchedulers.mainThread())
-                        .subscribeWith(disposableObserver));
+    public <T> Disposable requestIO2Main(Observable<T> observable, DisposableObserver<T> observer) {
+        Disposable d = observable.subscribeOn(Schedulers.io())
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribeWith(observer);
+        disposables.add(d);
+        return d;
     }
+
 
 }
