@@ -2,6 +2,7 @@ package me.tx.crazydog.camera2;
 
 import android.annotation.SuppressLint;
 import android.content.Context;
+import android.graphics.SurfaceTexture;
 import android.hardware.camera2.CameraAccessException;
 import android.hardware.camera2.CameraCaptureSession;
 import android.hardware.camera2.CameraCharacteristics;
@@ -12,17 +13,16 @@ import android.os.Handler;
 import android.os.HandlerThread;
 import android.util.Log;
 import android.view.Surface;
+import android.view.TextureView;
 
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 
 /**
  * Core manager for Camera2. Handles opening/closing camera, creating capture session and preview
  * while forwarding frames via ImageReaderManager.
  */
-public class CameraDeviceManager {
+public class CameraDeviceManager implements TextureView.SurfaceTextureListener { // 新增实现接口
 	private static final String TAG = "CameraDeviceManager";
 
 	private CameraManager mCameraManager;
@@ -36,6 +36,9 @@ public class CameraDeviceManager {
 	private CaptureRequest.Builder mPreviewRequestBuilder;
 	private CaptureRequest mPreviewRequest;
 
+	private TextureView mPreviewTextureView;
+	private Surface mPreviewSurface;
+
 	public CameraDeviceManager() {
 		mImageReaderManager = new ImageReaderManager();
 	}
@@ -44,6 +47,20 @@ public class CameraDeviceManager {
 		if (context == null) return;
 		mCameraManager = (CameraManager) context.getSystemService(Context.CAMERA_SERVICE);
 		startBackgroundThread();
+	}
+
+	public void setPreviewTextureView(TextureView textureView) {
+		if (textureView == null) {
+			Log.w(TAG, "setPreviewTextureView: textureView is null");
+			return;
+		}
+		mPreviewTextureView = textureView;
+		mPreviewTextureView.setSurfaceTextureListener(this);
+		if (mPreviewTextureView.isAvailable()) {
+			onSurfaceTextureAvailable(mPreviewTextureView.getSurfaceTexture(),
+					mPreviewTextureView.getWidth(),
+					mPreviewTextureView.getHeight());
+		}
 	}
 
 	public String[] getCameraIdList() {
@@ -67,7 +84,7 @@ public class CameraDeviceManager {
 	}
 
 	@SuppressLint("MissingPermission")
-    public void openCamera(String cameraId) {
+	public void openCamera(String cameraId) {
 		if (mCameraManager == null) {
 			Log.w(TAG, "CameraManager not initialized");
 			return;
@@ -93,29 +110,34 @@ public class CameraDeviceManager {
 				mCameraDevice.close();
 				mCameraDevice = null;
 			}
+			if (mPreviewSurface != null) {
+				mPreviewSurface.release();
+				mPreviewSurface = null;
+			}
 		} catch (Exception e) {
 			Log.e(TAG, "closeCamera error", e);
 		}
 	}
 
-	/**
-	 * Create capture session with the ImageReader surface (used for frame callback).
-	 * This will be called internally by startPreview().
-	 */
 	public void createCaptureSession() {
 		if (mCameraDevice == null) {
 			Log.w(TAG, "createCaptureSession: cameraDevice is null");
 			return;
 		}
-		Surface surface = mImageReaderManager.getSurface();
-		if (surface == null) {
+		Surface imageReaderSurface = mImageReaderManager.getSurface();
+		if (imageReaderSurface == null) {
 			Log.w(TAG, "createCaptureSession: imageReader surface is null");
+			return;
+		}
+		if (mPreviewSurface == null) {
+			Log.w(TAG, "createCaptureSession: preview surface is null");
 			return;
 		}
 
 		try {
 			List<Surface> surfaces = new ArrayList<>();
-			surfaces.add(surface);
+			surfaces.add(imageReaderSurface);
+			surfaces.add(mPreviewSurface);
 			mCameraDevice.createCaptureSession(surfaces, mSessionCallback, mBackgroundHandler);
 		} catch (CameraAccessException e) {
 			Log.e(TAG, "createCaptureSession failed", e);
@@ -125,6 +147,10 @@ public class CameraDeviceManager {
 	public void startPreview() {
 		if (mCameraDevice == null) {
 			Log.w(TAG, "startPreview: cameraDevice is null");
+			return;
+		}
+		if (mPreviewSurface == null) {
+			Log.w(TAG, "startPreview: preview surface not ready");
 			return;
 		}
 		createCaptureSession();
@@ -147,6 +173,7 @@ public class CameraDeviceManager {
 			mImageReaderManager.releaseImageReader();
 			mImageReaderManager = null;
 		}
+		mPreviewTextureView = null;
 	}
 
 	public ImageReaderManager getImageReaderManager() {
@@ -200,9 +227,10 @@ public class CameraDeviceManager {
 			if (mCameraDevice == null) return;
 			mCaptureSession = session;
 			try {
-				Surface surface = mImageReaderManager.getSurface();
+				Surface imageReaderSurface = mImageReaderManager.getSurface();
 				mPreviewRequestBuilder = mCameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW);
-				mPreviewRequestBuilder.addTarget(surface);
+				mPreviewRequestBuilder.addTarget(mPreviewSurface);
+				mPreviewRequestBuilder.addTarget(imageReaderSurface);
 				mPreviewRequestBuilder.set(CaptureRequest.CONTROL_MODE, CaptureRequest.CONTROL_MODE_AUTO);
 				mPreviewRequest = mPreviewRequestBuilder.build();
 				mCaptureSession.setRepeatingRequest(mPreviewRequest, null, mBackgroundHandler);
@@ -218,14 +246,44 @@ public class CameraDeviceManager {
 		}
 	};
 
-	/**
-	 * Attach an ImageReader callback and prepare ImageReader. Caller should call initImageReader first
-	 * via getImageReaderManager().initImageReader(width,height) then set listener.
-	 */
 	public void setFrameCallback(Camera2FrameCallback.FrameListener listener) {
 		if (mImageReaderManager == null) return;
 		Camera2FrameCallback callback = new Camera2FrameCallback();
 		callback.setFrameListener(listener);
 		mImageReaderManager.setOnImageAvailableListener(callback, mBackgroundHandler);
+	}
+
+	@Override
+	public void onSurfaceTextureAvailable(SurfaceTexture surfaceTexture, int width, int height) {
+		Log.d(TAG, "onSurfaceTextureAvailable: width=" + width + ", height=" + height);
+		mPreviewSurface = new Surface(surfaceTexture);
+		if (mCameraDevice != null) {
+			createCaptureSession();
+		}
+	}
+
+	@Override
+	public void onSurfaceTextureSizeChanged(SurfaceTexture surfaceTexture, int width, int height) {
+		Log.d(TAG, "onSurfaceTextureSizeChanged: width=" + width + ", height=" + height);
+		stopPreview();
+		if (mCameraDevice != null) {
+			createCaptureSession();
+		}
+	}
+
+	@Override
+	public boolean onSurfaceTextureDestroyed(SurfaceTexture surfaceTexture) {
+		Log.d(TAG, "onSurfaceTextureDestroyed");
+		if (mPreviewSurface != null) {
+			mPreviewSurface.release();
+			mPreviewSurface = null;
+		}
+		stopPreview();
+		return true;
+	}
+
+	@Override
+	public void onSurfaceTextureUpdated(SurfaceTexture surfaceTexture) {
+
 	}
 }
