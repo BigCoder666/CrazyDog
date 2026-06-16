@@ -19,7 +19,6 @@ import me.tx.crazydog.task.TaskDog;
 public abstract class CrazyActivity extends AppCompatActivity {
     Bundle savedInstanceState;
     private final CompositeDisposable disposables = new CompositeDisposable();
-
     public abstract void onActivityCreate(Bundle savedInstanceState);
     public <T> T getService(Class<T> service){
         T t = CrazyDog.getInstance().getNetDogService(service);
