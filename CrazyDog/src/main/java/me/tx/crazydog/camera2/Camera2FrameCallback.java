@@ -13,8 +13,25 @@ import java.nio.ByteBuffer;
 public class Camera2FrameCallback implements ImageReader.OnImageAvailableListener {
 	private static final String TAG = "Camera2FrameCallback";
 
-	public interface FrameListener {
-		void onFrameResult(byte[] nv21Data, int width, int height);
+	public abstract static class FrameListener {
+		int drop_frame_limit = 0;
+		int drop_frame_limit_count = 0;
+
+
+		public FrameListener(int drop_frame_limit){
+			this.drop_frame_limit = drop_frame_limit;
+		}
+
+		public boolean skip(){
+			drop_frame_limit_count++;
+			if(drop_frame_limit_count>=drop_frame_limit){
+				drop_frame_limit_count = 0;
+				return false;
+			}else {
+				return true;
+			}
+		}
+		public abstract void onFrameResult(byte[] nv21Data, int width, int height);
 	}
 
 	private FrameListener mListener;
@@ -32,7 +49,9 @@ public class Camera2FrameCallback implements ImageReader.OnImageAvailableListene
 
 			byte[] nv21 = getNV21DataFromImage(image);
 			if (nv21 != null && mListener != null) {
-				mListener.onFrameResult(nv21, image.getWidth(), image.getHeight());
+				if(!mListener.skip()) {
+					mListener.onFrameResult(nv21, image.getWidth(), image.getHeight());
+				}
 			}
 		} catch (Exception e) {
 			Log.e(TAG, "onImageAvailable error", e);

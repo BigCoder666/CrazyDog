@@ -39,9 +39,6 @@ public class MainActivity extends CrazyActivity {
 
     ImageView img_frame;
 
-    final int UPDATE_FRAME_LIMIT =15;
-    int UPDATE_FRAME_COUNT =0;
-
     @Override
     public void onActivityCreate(Bundle savedInstanceState) {
         setContentView(R.layout.activity_main);
@@ -114,38 +111,33 @@ public class MainActivity extends CrazyActivity {
         cameraManager.getImageReaderManager().initImageReader(1080,1920);
 
         // 4. 设置帧回调（如果需要处理图像数据）
-        cameraManager.setFrameCallback(new Camera2FrameCallback.FrameListener() {
+        cameraManager.setFrameCallback(new Camera2FrameCallback.FrameListener(5) {
             @Override
             public void onFrameResult(byte[] nv21Data, int width, int height) {
-                if(UPDATE_FRAME_COUNT>UPDATE_FRAME_LIMIT) {
-                    // 1. NV21 → Bitmap
-                    YuvImage yuvImage = new YuvImage(nv21Data, ImageFormat.NV21, width, height, null);
-                    ByteArrayOutputStream baos = new ByteArrayOutputStream();
-                    yuvImage.compressToJpeg(new Rect(0, 0, width, height), 90, baos);
-                    byte[] jpegData = baos.toByteArray();
-                    Bitmap rawBitmap = BitmapFactory.decodeByteArray(jpegData, 0, jpegData.length);
-                    // 2. 旋转 90 度（后置摄像头竖屏标准修正）
-                    Matrix matrix = new Matrix();
-                    matrix.postRotate(90);
-                    Bitmap rotatedBitmap = Bitmap.createBitmap(
-                            rawBitmap,
-                            0, 0,
-                            rawBitmap.getWidth(),
-                            rawBitmap.getHeight(),
-                            matrix,
-                            true
-                    );
-                    rawBitmap.recycle(); // 及时回收避免OOM
+                // 1. NV21 → Bitmap
+                YuvImage yuvImage = new YuvImage(nv21Data, ImageFormat.NV21, width, height, null);
+                ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                yuvImage.compressToJpeg(new Rect(0, 0, width, height), 90, baos);
+                byte[] jpegData = baos.toByteArray();
+                Bitmap rawBitmap = BitmapFactory.decodeByteArray(jpegData, 0, jpegData.length);
+                // 2. 旋转 90 度（后置摄像头竖屏标准修正）
+                Matrix matrix = new Matrix();
+                matrix.postRotate(90);
+                Bitmap rotatedBitmap = Bitmap.createBitmap(
+                        rawBitmap,
+                        0, 0,
+                        rawBitmap.getWidth(),
+                        rawBitmap.getHeight(),
+                        matrix,
+                        true
+                );
+                rawBitmap.recycle(); // 及时回收避免OOM
 
-                    // 3. 显示到 ImageView
-                    img_frame.post(() -> {
-                        img_frame.setImageBitmap(rotatedBitmap);
-                    });
-                    UPDATE_FRAME_COUNT = 0;
-                }else {
-                    UPDATE_FRAME_COUNT++;
-                }
-             }
+                // 3. 显示到 ImageView
+                img_frame.post(() -> {
+                    img_frame.setImageBitmap(rotatedBitmap);
+                });
+            }
         });
 
         CrazyPermission.camera(this, new CrazyPermission.IPermissionResult() {
