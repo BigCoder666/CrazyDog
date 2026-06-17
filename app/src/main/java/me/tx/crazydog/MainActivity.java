@@ -17,9 +17,21 @@ import androidx.appcompat.app.AppCompatActivity;
 
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONObject;
+import com.baidu.idl.main.facesdk.model.BDFaceSDKCommon;
+import com.baidu.idl.main.facesdk.model.Feature;
+import com.example.authlibrary.BdFaceAuth;
+import com.example.datalibrary.api.FaceApi;
+import com.example.datalibrary.listener.DBLoadListener;
+import com.example.datalibrary.listener.SdkInitListener;
+import com.example.datalibrary.manager.FaceSDKManager;
+import com.example.datalibrary.model.User;
+import com.example.datalibrary.utils.FaceUtils;
+import com.example.datalibrary.utils.ToastUtils;
 
 import java.io.ByteArrayOutputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
+import java.util.List;
 
 import io.reactivex.rxjava3.annotations.NonNull;
 import io.reactivex.rxjava3.disposables.Disposable;
@@ -111,7 +123,7 @@ public class MainActivity extends CrazyActivity {
         cameraManager.getImageReaderManager().initImageReader(1080,1920);
 
         // 4. 设置帧回调（如果需要处理图像数据）
-        cameraManager.setFrameCallback(new Camera2FrameCallback.FrameListener(5) {
+        cameraManager.setFrameCallback(new Camera2FrameCallback.FrameListener(100) {
             @Override
             public void onFrameResult(byte[] nv21Data, int width, int height) {
                 // 1. NV21 → Bitmap
@@ -137,10 +149,32 @@ public class MainActivity extends CrazyActivity {
                 img_frame.post(() -> {
                     img_frame.setImageBitmap(rotatedBitmap);
                 });
+
+                if(FaceSDKManager.initStatus == FaceSDKManager.SDK_MODEL_LOAD_SUCCESS){
+                    byte[] feature512 = new byte[512];
+                    float ret = FaceSDKManager.getInstance().personDetect(rotatedBitmap,feature512,FaceUtils.getInstance().getBDFaceCheckConfig(),MainActivity.this);
+
+                    if(ret == 128){
+                        List<? extends Feature> featureList = FaceSDKManager.getInstance().getFaceSearch().search(BDFaceSDKCommon.FeatureType.BDFACE_FEATURE_TYPE_ID_PHOTO,0,1,feature512);
+                        if(featureList==null||featureList.size()==0){
+                            ToastUtils.toast(MainActivity.this,"抓到特征!\n无数据");
+                            FaceSDKManager.getInstance().getFaceSearch().pushPersonById((int)(System.currentTimeMillis()%10000000),feature512);
+                        }else{
+                            if(featureList.get(0).getScore()<80&&featureList.get(0).getScore()>60){
+                                ToastUtils.toast(MainActivity.this,"抓到特征!\n比对分数不确定：分数"+featureList.get(0).getScore());
+                            }else if(featureList.get(0).getScore()<60){
+                                ToastUtils.toast(MainActivity.this,"抓到特征!\n"+"新用户，进行注册");
+                                FaceSDKManager.getInstance().getFaceSearch().pushPersonById((int)(System.currentTimeMillis()%10000000),feature512);
+                            }else {
+                                ToastUtils.toast(MainActivity.this, "抓到特征!\n你是ID：" + featureList.get(0).getId());
+                            }
+                        }
+                    }
+                }
             }
         });
 
-        CrazyPermission.camera(this, new CrazyPermission.IPermissionResult() {
+        CrazyPermission.cameraAndStorage(this, new CrazyPermission.IPermissionResult() {
             @Override
             public void result(boolean allGranted) {
                 if(allGranted){
@@ -152,10 +186,77 @@ public class MainActivity extends CrazyActivity {
 
                     // 6. 启动预览
                     cameraManager.startPreview();
+
+                    dbSdkInit();
+
                 }
             }
         });
 
+    }
+
+
+    private void dbSdkInit(){
+        BdFaceAuth bdFaceAuth = new BdFaceAuth();
+        bdFaceAuth.initLicenseOnLine(this, "3TWX-NFK7-FDEF-QQEB", new com.baidu.idl.main.facesdk.callback.Callback() {
+            @Override
+            public void onResponse(int code, String msg) {
+                if(code == 0){
+                    ToastUtils.toast(MainActivity.this,"激活成功");
+                    FaceSDKManager.getInstance().initModel(MainActivity.this, FaceUtils.getInstance().getBDFaceSDKConfig(), new SdkInitListener() {
+                        @Override
+                        public void initStart() {
+
+                        }
+
+                        @Override
+                        public void initLicenseSuccess() {
+
+                        }
+
+                        @Override
+                        public void initLicenseFail(int errorCode, String msg) {
+
+                        }
+
+                        @Override
+                        public void initModelSuccess() {
+                            ToastUtils.toast(MainActivity.this,"模型初始化成功");
+                            FaceSDKManager.initModelSuccess = true;
+                        }
+
+                        @Override
+                        public void initModelFail(int errorCode, String msg) {
+                            ToastUtils.toast(MainActivity.this,"模型初始化失败："+msg);
+                        }
+                    });
+
+                    FaceApi.getInstance().init(new DBLoadListener() {
+                        @Override
+                        public void onStart(int successCount) {
+
+                        }
+
+                        @Override
+                        public void onLoad(int finishCount, int successCount, float progress) {
+
+                        }
+
+                        @Override
+                        public void onComplete(List<User> features, int successCount) {
+                            ToastUtils.toast(MainActivity.this,"数据库初始化成功");
+                        }
+
+                        @Override
+                        public void onFail(int finishCount, int successCount, List<User> features) {
+                            ToastUtils.toast(MainActivity.this,"数据库初始化失败");
+                        }
+                    },MainActivity.this);
+                }else {
+                    ToastUtils.toast(MainActivity.this,"激活失败");
+                }
+            }
+        });
     }
 
     @Override

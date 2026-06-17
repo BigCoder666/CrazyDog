@@ -2,6 +2,8 @@ package me.tx.crazydog;
 
 import android.os.Build;
 
+import com.baidu.idl.main.facesdk.utils.PreferencesUtil;
+
 import java.lang.reflect.Array;
 import java.util.Arrays;
 import java.util.Collections;
@@ -11,6 +13,11 @@ import me.tx.crazydog.net.NetDogSetting;
 import me.tx.crazydog.ui.CrazyApp;
 
 public class MyApp extends CrazyApp {
+    @Override
+    public void onCreate(){
+        super.onCreate();
+        PreferencesUtil.initPrefs(this);
+    }
     @Override
     public List<NetDogSetting> buildNetDog() {
         List<NetDogSetting> listService = Arrays.asList(

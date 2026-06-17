@@ -16,7 +16,6 @@ public class TestTask extends TaskDog<Boolean> {
                 Thread.sleep(1000);
             } catch (InterruptedException e) {
             }
-            Log.e("TaskDog","努力加载中...");
         }
         return true;
     }

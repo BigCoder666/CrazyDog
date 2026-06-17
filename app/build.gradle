@@ -30,6 +30,8 @@ android {
 
 dependencies {
     implementation project(':CrazyDog')
+    api project(':datalibrary')
     implementation fileTree(include: ['*.jar', '*.aar'], dir: 'libs')
+    implementation 'androidx.appcompat:appcompat:1.4.1'
 
 }
