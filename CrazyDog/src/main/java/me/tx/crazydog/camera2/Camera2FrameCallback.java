@@ -1,5 +1,6 @@
 package me.tx.crazydog.camera2;
 
+import android.graphics.Bitmap;
 import android.media.Image;
 import android.media.ImageReader;
 import android.util.Log;
@@ -47,9 +48,9 @@ public class Camera2FrameCallback implements ImageReader.OnImageAvailableListene
 			image = reader.acquireLatestImage();
 			if (image == null) return;
 
-			byte[] nv21 = getNV21DataFromImage(image);
-			if (nv21 != null && mListener != null) {
-				if(!mListener.skip()) {
+			if(mListener!=null && !mListener.skip()) {
+				byte[] nv21 = getNV21DataFromImage(image);
+				if (nv21 != null) {
 					mListener.onFrameResult(nv21, image.getWidth(), image.getHeight());
 				}
 			}
@@ -58,6 +59,7 @@ public class Camera2FrameCallback implements ImageReader.OnImageAvailableListene
 		} finally {
 			if (image != null) image.close();
 		}
+
 	}
 
 	/**
@@ -132,5 +134,46 @@ public class Camera2FrameCallback implements ImageReader.OnImageAvailableListene
 		}
 
 		return nv21;
+	}
+
+	/**
+	 * 直接用你已经拿到的 nv21 转 Bitmap，无JPEG，开销极低
+	 */
+	public static Bitmap nv21ToBitmap(byte[] nv21, int width, int height) {
+		int[] argb = new int[width * height];
+		decodeYUV420SP(argb, nv21, width, height);
+		return Bitmap.createBitmap(argb, width, height, Bitmap.Config.ARGB_8888);
+	}
+
+	/**
+	 * YUV NV21 转 ARGB（高速算法）
+	 */
+	private static void decodeYUV420SP(int[] rgba, byte[] yuv420sp, int width, int height) {
+		final int frameSize = width * height;
+
+		for (int j = 0; j < height; j++) {
+			for (int i = 0; i < width; i++) {
+				// Y
+				int y = 0xff & yuv420sp[j * width + i];
+				// U/V 位置
+				int uvp = frameSize + (j >> 1) * width + (i & ~1);
+				int v = 0xff & yuv420sp[uvp];
+				int u = 0xff & yuv420sp[uvp + 1];
+
+				y = (y - 16) * 1164;
+				u -= 128;
+				v -= 128;
+
+				int r = (y + 1596 * v) / 1000;
+				int g = (y -  813 * v - 392 * u) / 1000;
+				int b = (y + 2018 * u) / 1000;
+
+				r = r < 0 ? 0 : r > 255 ? 255 : r;
+				g = g < 0 ? 0 : g > 255 ? 255 : g;
+				b = b < 0 ? 0 : b > 255 ? 255 : b;
+
+				rgba[j * width + i] = 0xff000000 | (r << 16) | (g << 8) | b;
+			}
+		}
 	}
 }

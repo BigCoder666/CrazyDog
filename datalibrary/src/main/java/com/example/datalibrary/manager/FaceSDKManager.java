@@ -31,11 +31,15 @@ import com.example.datalibrary.model.BDLiveConfig;
 import com.example.datalibrary.model.BDQualityConfig;
 import com.example.datalibrary.model.LivenessModel;
 import com.example.datalibrary.model.User;
+import com.example.datalibrary.threshold.SingleBaseConfig;
+import com.example.datalibrary.utils.FaceUtils;
 import com.example.datalibrary.utils.LogUtils;
 import com.example.datalibrary.utils.ToastUtils;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -59,10 +63,145 @@ public class FaceSDKManager {
     private boolean checkMouthMask = false;
     private boolean isMultiIdentify = true;
 
+    ArrayBlockingQueue<CameraData> recognizeFeatureQueue = new ArrayBlockingQueue<>(3);
+
+    RecognizeThread recognizeThread;
+    IRecResult iRecResult;
+
+    public class CameraData{
+        public byte[] nv21;
+        public int width;
+        public int height;
+
+        public CameraData(byte[] nv21,int width,int height){
+            this.nv21 = nv21;
+            this.width = width;
+            this.height = height;
+        }
+    }
+
+    public interface IRecResult{
+        void notSure(User u,float score);
+        void sure(User u,float score);
+        void unknow();
+        void tips(String msg);
+    }
+
+    private class RecognizeThread extends Thread{
+        boolean interrept = false;
+        String GROUP_ID = "";
+        BDFaceImageConfig config;
+
+        public RecognizeThread(String GROUP_ID){
+            super();
+            this.GROUP_ID = GROUP_ID;
+        }
+
+        @Override
+        public void run(){
+            while (!interrept){
+                try {
+                    CameraData cameraData = recognizeFeatureQueue.take();
+                    if(cameraData!=null){
+                        config = new BDFaceImageConfig(cameraData.height,cameraData.width,
+                                SingleBaseConfig.getBaseConfig().getRgbDetectDirection(),
+                                SingleBaseConfig.getBaseConfig().getMirrorDetectRGB(),
+                                BDFaceSDKCommon.BDFaceImageType.BDFACE_IMAGE_TYPE_YUV_NV21);
+                        config.setData(cameraData.nv21);
+                        FaceSDKManager.getInstance().onDetectCheck(
+                                config,
+                                null,
+                                null,
+                                FaceUtils.getInstance().getBDFaceCheckConfig(),
+                                new FaceDetectCallBack() {
+                                    @Override
+                                    public void onFaceDetectCallback(List<LivenessModel> livenessModel) {
+                                        if(livenessModel!=null && livenessModel.size()>0){
+                                            LivenessModel model0 = livenessModel.get(0);
+                                            User u = model0.getUser();
+                                            if(u!=null) {
+                                                float score = model0.getFeatureScore();
+                                                if (score < 90) {
+                                                    if (iRecResult != null) {
+                                                        iRecResult.notSure(u, score);
+                                                    }
+                                                } else {
+                                                    if (iRecResult != null) {
+                                                        iRecResult.sure(u, score);
+                                                    }
+                                                }
+                                            }else {
+                                                if (iRecResult != null) {
+                                                    iRecResult.unknow();
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    @Override
+                                    public void onTip(int code, String msg) {
+                                        if (iRecResult != null) {
+                                            iRecResult.tips(msg);
+                                        }
+                                    }
+
+                                    @Override
+                                    public void onFaceDetectDarwCallback(List<LivenessModel> livenessModel) {
+
+                                    }
+                                });
+//                        byte[] feature512 = new byte[512];
+//                        float ret = FaceSDKManager.getInstance().personDetect(bitmap, feature512, FaceUtils.getInstance().getBDFaceCheckConfig());
+//                        if (ret == 128) {
+//                            List<? extends Feature> featureList = FaceSDKManager.getInstance().getFaceSearch().search(BDFaceSDKCommon.FeatureType.BDFACE_FEATURE_TYPE_ID_PHOTO, 0, 1, feature512);
+//                            if (featureList == null || featureList.size() == 0) {
+//                                if(iRecResult!=null){
+//                                    iRecResult.unknown(feature512);
+//                                }
+//                            } else {
+//                                if (featureList.get(0).getScore() < 90 && featureList.get(0).getScore() > 60) {
+//                                    User u = FaceApi.getInstance().getUserListById(featureList.get(0).getId());
+//                                    if(iRecResult!=null && u!=null) {
+//                                        iRecResult.notSure(u, featureList.get(0).getScore());
+//                                    }
+//                                } else if (featureList.get(0).getScore() < 60) {
+//                                    if(iRecResult!=null){
+//                                        iRecResult.unknown(feature512);
+//                                    }
+//                                } else {
+//                                    User u = FaceApi.getInstance().getUserListById(featureList.get(0).getId());
+//                                    if(iRecResult!=null && u!=null){
+//                                        iRecResult.sure(u,featureList.get(0).getScore());
+//                                    }
+//                                }
+//                            }
+//                        }
+                    }
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+    }
+
+    public void startRecognize(String GROUP_ID,IRecResult iRecResult){
+        this.iRecResult = iRecResult;
+        if(recognizeThread==null || recognizeThread.interrept){
+            recognizeThread = new RecognizeThread(GROUP_ID);
+            recognizeThread.start();
+        }
+    }
+
+    public void feed(byte[] nv21data, int width, int height) {
+        recognizeFeatureQueue.offer(new CameraData(nv21data,width,height));
+    }
+
     private FaceSDKManager() {
         faceAuth = new FaceAuth();
         faceAuth.setCoreConfigure(BDFaceSDKCommon.BDFaceCoreRunMode.BDFACE_LITE_POWER_NO_BIND, 2);
     }
+
+
 
     public void setActiveLog(boolean isLog) {
         LogUtils.isDebug = isLog;
@@ -676,7 +815,7 @@ public class FaceSDKManager {
 
     // 人证核验特征提取
     public float personDetect(
-            final Bitmap bitmap, final byte[] feature, final BDFaceCheckConfig bdFaceCheckConfig, Context context) {
+            final Bitmap bitmap, final byte[] feature, final BDFaceCheckConfig bdFaceCheckConfig) {
         LogUtils.d(TAG, "personDetect bdFaceCheckConfig is " + (bdFaceCheckConfig == null));
         BDFaceImageInstance rgbInstance = new BDFaceImageInstance(bitmap);
         float ret = -1;
@@ -700,7 +839,7 @@ public class FaceSDKManager {
             return -10;
         }
         // 判断质量检测，针对模糊度、遮挡、角度
-        if (!faceModel.onQualityCheck(faceInfos[0], bdQualityConfig, checkMouthMask, new FaceQualityBack(context))) {
+        if (!faceModel.onQualityCheck(faceInfos[0], bdQualityConfig, checkMouthMask, new FaceQualityBack())) {
             LogUtils.d(TAG, "Quality Not passed");
             return -11;
         }
