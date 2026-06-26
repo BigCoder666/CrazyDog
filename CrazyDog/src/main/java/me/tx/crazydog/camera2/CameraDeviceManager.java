@@ -119,19 +119,19 @@ public class CameraDeviceManager implements TextureView.SurfaceTextureListener {
 		}
 	}
 
-	public void createCaptureSession() {
+	public boolean createCaptureSession() {
 		if (mCameraDevice == null) {
 			Log.w(TAG, "createCaptureSession: cameraDevice is null");
-			return;
+			return false;
 		}
 		Surface imageReaderSurface = mImageReaderManager.getSurface();
 		if (imageReaderSurface == null) {
 			Log.w(TAG, "createCaptureSession: imageReader surface is null");
-			return;
+			return false;
 		}
 		if (mPreviewSurface == null) {
 			Log.w(TAG, "createCaptureSession: preview surface is null");
-			return;
+			return false;
 		}
 
 		try {
@@ -141,19 +141,22 @@ public class CameraDeviceManager implements TextureView.SurfaceTextureListener {
 			mCameraDevice.createCaptureSession(surfaces, mSessionCallback, mBackgroundHandler);
 		} catch (CameraAccessException e) {
 			Log.e(TAG, "createCaptureSession failed", e);
+			return false;
 		}
+		return true;
 	}
 
-	public void startPreview() {
+	public boolean startPreview() {
 		if (mCameraDevice == null) {
 			Log.w(TAG, "startPreview: cameraDevice is null");
-			return;
+			return false;
 		}
 		if (mPreviewSurface == null) {
 			Log.w(TAG, "startPreview: preview surface not ready");
-			return;
+			return false;
 		}
 		createCaptureSession();
+		return true;
 	}
 
 	public void stopPreview() {

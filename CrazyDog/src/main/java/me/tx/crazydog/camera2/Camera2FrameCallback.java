@@ -14,6 +14,10 @@ import java.nio.ByteBuffer;
 public class Camera2FrameCallback implements ImageReader.OnImageAvailableListener {
 	private static final String TAG = "Camera2FrameCallback";
 
+	public byte[] lastNv21Data =null;
+	public int lastwidth=0;
+	public int lastheight=0;
+
 	public abstract static class FrameListener {
 		int drop_frame_limit = 0;
 		int drop_frame_limit_count = 0;
@@ -51,6 +55,9 @@ public class Camera2FrameCallback implements ImageReader.OnImageAvailableListene
 			if(mListener!=null && !mListener.skip()) {
 				byte[] nv21 = getNV21DataFromImage(image);
 				if (nv21 != null) {
+					lastNv21Data = nv21;
+					lastwidth = image.getWidth();
+					lastheight = image.getHeight();
 					mListener.onFrameResult(nv21, image.getWidth(), image.getHeight());
 				}
 			}

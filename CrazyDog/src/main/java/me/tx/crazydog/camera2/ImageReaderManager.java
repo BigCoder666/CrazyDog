@@ -1,5 +1,6 @@
 package me.tx.crazydog.camera2;
 
+import android.graphics.Bitmap;
 import android.media.ImageReader;
 import android.util.Log;
 import android.view.Surface;
@@ -12,6 +13,13 @@ public class ImageReaderManager {
 
 	private ImageReader mImageReader;
 	private Camera2FrameCallback mFrameCallback;
+
+	public Bitmap getLastBitmap(){
+		if(mFrameCallback!=null){
+			return mFrameCallback.nv21ToBitmap(mFrameCallback.lastNv21Data,mFrameCallback.lastwidth,mFrameCallback.lastheight);
+		}
+		return null;
+	}
 
 	public ImageReaderManager() {
 	}

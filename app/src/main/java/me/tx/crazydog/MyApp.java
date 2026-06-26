@@ -2,7 +2,6 @@ package me.tx.crazydog;
 
 import android.os.Build;
 
-import com.baidu.idl.main.facesdk.utils.PreferencesUtil;
 
 import java.lang.reflect.Array;
 import java.util.Arrays;
@@ -16,7 +15,6 @@ public class MyApp extends CrazyApp {
     @Override
     public void onCreate(){
         super.onCreate();
-        PreferencesUtil.initPrefs(this);
     }
     @Override
     public List<NetDogSetting> buildNetDog() {

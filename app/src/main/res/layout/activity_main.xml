@@ -13,17 +13,8 @@
     <Button
         android:layout_width="100dp"
         android:layout_height="50dp"
-        android:text="TEST"
+        android:text="test"
         android:gravity="center"
         android:id="@+id/test"/>
-
-    <androidx.recyclerview.widget.RecyclerView
-        android:layout_width="150dp"
-        android:layout_height="300dp"
-        android:scaleType="centerInside"
-        android:background="@color/white"
-        android:layout_alignParentBottom="true"
-        android:layout_alignParentRight="true"
-        android:id="@+id/recycler_view"/>
 
 </RelativeLayout>
